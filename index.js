@@ -1,71 +1,54 @@
-const express = require("express");
-const knexLib = require("knex");
-const ip = require("ip");
-const app = express();
-app.use(express.json());
+const Database = require("better-sqlite3");
 
-// Initialize knex with SQLite
-const db = knexLib({
-  client: "sqlite3",
-  connection: {
-    filename: "./data.sqlite",
-  },
-  useNullAsDefault: true,
-});
+// Create or open a database file
+const db = new Database("sample.db");
 
-// Create users table if not exists
-db.schema.hasTable("users").then((exists) => {
-  if (!exists) {
-    return db.schema.createTable("users", (table) => {
-      table.increments("id");
-      table.string("name");
-      table.string("email");
-    });
-  }
-});
+// Create a table
+db.prepare(
+  `
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL
+  )
+`
+).run();
 
-// Routes
-app.get("/users", async (req, res) => {
-  const users = await db("users").select("*");
-  res.json(users);
-});
-
-app.post("/users", async (req, res) => {
-  const { name, email } = req.body;
-  const [id] = await db("users").insert({ name, email });
-  res.json({ id, name, email });
-});
-
-app.get("/users/:id", async (req, res) => {
-  const user = await db("users").where({ id: req.params.id }).first();
-  if (user) res.json(user);
-  else res.status(404).json({ message: "User not found" });
-});
-
-app.delete("/users/:id", async (req, res) => {
-  const deleted = await db("users").where({ id: req.params.id }).del();
-  if (deleted) res.json({ message: "User deleted" });
-  else res.status(404).json({ message: "User not found" });
-});
-
-// Get local IP address
-function getLocalIP() {
-  const interfaces = os.networkInterfaces();
-  for (const name in interfaces) {
-    for (const iface of interfaces[name]) {
-      if (iface.family === "IPv4" && !iface.internal) {
-        return iface.address;
-      }
-    }
-  }
-  return "localhost";
+// === CREATE ===
+function createUser(name, email) {
+  const stmt = db.prepare("INSERT INTO users (name, email) VALUES (?, ?)");
+  const info = stmt.run(name, email);
+  console.log("User created with ID:", info.lastInsertRowid);
 }
 
-const PORT = 3000;
+// === READ ===
+function getUsers() {
+  const stmt = db.prepare("SELECT * FROM users");
+  const users = stmt.all();
+  console.log("All Users:", users);
+}
 
-app.listen(PORT, "0.0.0.0", () => {
-  const localIP = ip.address(); // Use ip package to get the local IP
-  console.log(`API running at:`);
-  console.log(`→ Local:   http://localhost:${PORT}`);
-  console.log(`→ Network: http://${localIP}:${PORT}`);
-});
+// === UPDATE ===
+function updateUser(id, newName) {
+  const stmt = db.prepare("UPDATE users SET name = ? WHERE id = ?");
+  const info = stmt.run(newName, id);
+  console.log(`Updated ${info.changes} user(s)`);
+}
+
+// === DELETE ===
+function deleteUser(id) {
+  const stmt = db.prepare("DELETE FROM users WHERE id = ?");
+  const info = stmt.run(id);
+  console.log(`Deleted ${info.changes} user(s)`);
+}
+
+// Example usage
+createUser("Alice", "alice@example.com");
+createUser("Bob", "bob@example.com");
+
+getUsers();
+
+updateUser(1, "Alice Updated");
+deleteUser(2);
+
+getUsers();
