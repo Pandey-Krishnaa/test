@@ -1,7 +1,6 @@
 const express = require("express");
 const knexLib = require("knex");
-const os = require("os");
-
+const ip = require("ip");
 const app = express();
 app.use(express.json());
 
@@ -65,8 +64,8 @@ function getLocalIP() {
 const PORT = 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  const ip = getLocalIP();
+  const localIP = ip.address(); // Use ip package to get the local IP
   console.log(`API running at:`);
   console.log(`→ Local:   http://localhost:${PORT}`);
-  console.log(`→ Network: http://${ip}:${PORT}`);
+  console.log(`→ Network: http://${localIP}:${PORT}`);
 });
