@@ -1,54 +1,59 @@
 const Database = require("better-sqlite3");
+const { drizzle } = require("drizzle-orm/better-sqlite3");
+const { sqliteTable, text, integer } = require("drizzle-orm/sqlite-core");
+const { eq } = require("drizzle-orm");
 
-// Create or open a database file
-const db = new Database("sample.db");
+// Initialize DB
+const sqlite = new Database("drizzle-example.db");
+const db = drizzle(sqlite);
 
-// Create a table
-db.prepare(
-  `
+// Define schema
+const users = sqliteTable("users", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+});
+
+// Create table
+sqlite.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL
-  )
-`
-).run();
+    email TEXT NOT NULL UNIQUE
+  );
+`);
 
 // === CREATE ===
-function createUser(name, email) {
-  const stmt = db.prepare("INSERT INTO users (name, email) VALUES (?, ?)");
-  const info = stmt.run(name, email);
-  console.log("User created with ID:", info.lastInsertRowid);
+async function createUser(name, email) {
+  await db.insert(users).values({ name, email });
+  console.log(`User '${name}' created`);
 }
 
 // === READ ===
-function getUsers() {
-  const stmt = db.prepare("SELECT * FROM users");
-  const users = stmt.all();
-  console.log("All Users:", users);
+async function getUsers() {
+  const result = await db.select().from(users);
+  console.log("Users:", result);
 }
 
 // === UPDATE ===
-function updateUser(id, newName) {
-  const stmt = db.prepare("UPDATE users SET name = ? WHERE id = ?");
-  const info = stmt.run(newName, id);
-  console.log(`Updated ${info.changes} user(s)`);
+async function updateUser(id, newName) {
+  await db.update(users).set({ name: newName }).where(eq(users.id, id));
+  console.log(`User ID ${id} updated`);
 }
 
 // === DELETE ===
-function deleteUser(id) {
-  const stmt = db.prepare("DELETE FROM users WHERE id = ?");
-  const info = stmt.run(id);
-  console.log(`Deleted ${info.changes} user(s)`);
+async function deleteUser(id) {
+  await db.delete(users).where(eq(users.id, id));
+  console.log(`User ID ${id} deleted`);
 }
 
-// Example usage
-createUser("Alice", "alice@example.com");
-createUser("Bob", "bob@example.com");
+// Usage Example
+(async () => {
+  await createUser("Alice", "alice@demo.com");
+  await createUser("Bob", "bob@demo.com");
+  await getUsers();
 
-getUsers();
-
-updateUser(1, "Alice Updated");
-deleteUser(2);
-
-getUsers();
+  await updateUser(1, "Alice Updated");
+  await deleteUser(2);
+  await getUsers();
+})();
